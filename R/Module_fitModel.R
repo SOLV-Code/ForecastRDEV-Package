@@ -62,7 +62,7 @@ if(!(model %in% model.available)){
 
 if(model %in% list.custom.models ){
 
-out.list <-  model.functions.src[[model]]$fitting(data = data,settings = settings)
+out.list <-  model.functions.src[[model]]$fitting(data = data,settings = settings,tracing = tracing)
 
 
 }
