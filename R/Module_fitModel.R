@@ -33,6 +33,9 @@ fitModel <- function(model= NULL, # can't provide argument list here anymore, be
 
 model.functions.src <- c(estimation.functions,custom.models)
 
+list.builtin.models <- names(estimation.functions)
+list.custom.models <- names(custom.models)
+
 model.available <- names(model.functions.src)
 
 
@@ -49,7 +52,27 @@ if(!(model %in% model.available)){
 # any other check needed here?
 
 
-#  create empty list to store outputs
+
+
+# BELOW ARE THE FITTING STEPS FOR THE BUILT-IN MODELS
+# FOR THE CUSTOM MODELS, A FITTING FUNCTION NEEDS TO BE PART OF THE object
+# once we have that set up and it works, then we implement the same way for the 
+# built-in functions
+# The custom fitting function needs to ceate an object "out.list" with the following elements
+
+if(model %in% list.custom.models ){
+
+out.list <-  model.functions.src[[model]]$fitting(data = data,settings = settings)
+
+
+}
+
+
+# THIS CHUNK DOES THE FITTING FOR BUILT IN MODELS 
+# for now those don't have a fitting function yet
+
+if(model %in% list.builtin.models ){
+#  create empty list to store outputs, if not using custom function
 out.list <- list()
 
 
@@ -99,6 +122,12 @@ if(!any(is.na(ages))){  # if have age classes, loop through them
 
 
 } # end if naive variation
+
+
+
+
+
+
 
 
 if(model %in%  c("ReturnRate")){
@@ -429,7 +458,7 @@ if(model %in%  c("NoAgeCovar")){
 } # end if no age with covar
 
 
-
+} # end if doing a built-in model
 
 
 
