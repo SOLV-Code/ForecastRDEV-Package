@@ -58,12 +58,13 @@ if(!(model %in% model.available)){
 # FOR THE CUSTOM MODELS, A FITTING FUNCTION NEEDS TO BE PART OF THE object
 # once we have that set up and it works, then we implement the same way for the 
 # built-in functions
-# The custom fitting function needs to ceate an object "out.list" with the following elements
+# The custom fitting function needs to ceate an object "out.list" with the following elements:
+# Include LIST
 
 if(model %in% list.custom.models ){
 
-out.list <-  model.functions.src[[model]]$fitting()
-#out.list <-  model.functions.src[[model]]$fitting(data = data,settings = settings,tracing = tracing)
+
+out.list <-  model.functions.src[[model]]$fitting(data. = data,settings. = settings,tracing. = tracing)
 
 
 }
