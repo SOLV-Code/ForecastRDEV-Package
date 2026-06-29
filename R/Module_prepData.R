@@ -49,6 +49,18 @@ if(has.age.col){has.age.data <-  any(tolower(unique(datafile$Age_Class)) != "tot
 if(has.age.data) { file.type <- "WithAge" }
 if(!has.age.data){ file.type <- "WithoutAge"}
 
+# flag if
+
+spn.check <- sum(grepl("Spn|Spawner|Esc",tolower(names(datafile))))
+
+if(spn.check == 0){has.spn <- FALSE}
+if(spn.check == 1){has.spn <- TRUE
+				   spn.col <- names(datafile)[grepl("Spn|Spawner|Esc",tolower(names(datafile)))]
+				   }
+if(spn.check >1){warning("Data file has multiple possible spawner columns! Can only have one column label that contains Spn, Spawner, or Esc")
+				stop()}
+
+
 cov.list <- names(datafile)[grep("cov_",tolower(names(datafile)))]
 #print(cov.list)
 #print(length(cov.list))
@@ -159,7 +171,35 @@ if(has.total){tmpsub.use[["Age Total"]] <- NULL }
 
 datafile_new  <- Reduce(function(...) merge(...,by=year.labels[2], all=T), lapply(tmpsub.use,function(x) x[,2:3]))
 
-datafile_new <- cbind(datafile_new,Total = rowSums(datafile_new, na.rm = TRUE))
+datafile_new <- cbind(datafile_new,Total = rowSums(datafile_new %>% select(-Brood_Year), na.rm = TRUE))
+
+
+##############################
+# Add spawners, if in data file
+
+if(has.spn){
+
+# get simplified spn df
+
+spn.simple <- datafile %>% select(Brood_Year,all_of(spn.col)) %>% unique()
+
+# warning and error of have different spawner numbers for same brood year
+dupl.flag <- sum(duplicated(spn.simple$Brood_Year))
+if(dupl.flag){warning("Data file has multiple spawner values for the same brood year. Need to fix!")
+				stop() }
+
+if(!dupl.flag){
+
+datafile_new <- datafile_new %>% left_join(spn.simple, by = "Brood_Year")
+
+}
+}
+
+
+
+
+
+
 
 
 # Removing this for now, because stripping out totals
@@ -201,7 +241,14 @@ data.obj <- list(data=tmpsub, data.original=data.original, output.pre = datafile
 
 
 #############
-#covariates
+# Add covariates, predictors
+
+
+
+
+
+
+
 
 if(length(cov.list)>0){
 
@@ -230,6 +277,12 @@ if(length(predictor.list)>0){
 	data.obj <- c(data.obj,list(predictors = tmpsub.pred))
 
 }
+
+
+
+
+
+
 
 
 
