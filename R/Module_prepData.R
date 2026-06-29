@@ -184,7 +184,7 @@ if(has.spn){
 spn.simple <- datafile %>% select(Brood_Year,all_of(spn.col)) %>% unique()
 
 # warning and error of have different spawner numbers for same brood year
-dupl.flag <- sum(duplicated(spn.simple$Brood_Year))
+dupl.flag <- sum(duplicated(spn.simple$Brood_Year)) > 0
 if(dupl.flag){warning("Data file has multiple spawner values for the same brood year. Need to fix!")
 				stop() }
 
