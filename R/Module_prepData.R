@@ -23,291 +23,329 @@
 #' @export
 #'
 #' @examples
-prepData <- function(datafile,out.labels = "v1"){
-# datafile is a data frame object created by read.csv (with stringsAsFactors=FALSE)
-# required columns:
-# Run_Year
 
-# optional columns: Age_Class : This can include just numbers, or numbers and
-# "Total". Both cases are handled. Brood_Year: can either incl BY data, or NA
-# (without age data, or Total rows in withage data) Cov_SomeLabel: As many
-# covariates as you like, all must have the prefix "Cov_" and no other "_"
 
-
-# remove any columns that have only NA values
-
-datafile <- datafile[,colSums(!is.na(datafile)) >0]
-
-
-
-# Check file to identify format
-# 2 possibilities:WithAge, WithoutAge
-
-has.age.col <- tolower("Age_Class") %in% tolower(names(datafile))
-if(!has.age.col){has.age.data <- FALSE}
-if(has.age.col){has.age.data <-  any(tolower(unique(datafile$Age_Class)) != "total")}
-if(has.age.data) { file.type <- "WithAge" }
-if(!has.age.data){ file.type <- "WithoutAge"}
-
-# flag if
-
-spn.check <- sum(grepl("Spn|Spawner|Esc",tolower(names(datafile))))
-
-if(spn.check == 0){has.spn <- FALSE}
-if(spn.check == 1){has.spn <- TRUE
-				   spn.col <- names(datafile)[grepl("Spn|Spawner|Esc",tolower(names(datafile)))]
-				   }
-if(spn.check >1){warning("Data file has multiple possible spawner columns! Can only have one column label that contains Spn, Spawner, or Esc")
-				stop()}
-
-
-cov.list <- names(datafile)[grep("cov_",tolower(names(datafile)))]
-#print(cov.list)
-#print(length(cov.list))
-predictor.list <- names(datafile)[grep("pred_",tolower(names(datafile)))]
-#print(predictor.list)
-#print(length(predictor.list))
-
-stockabundance <- gsub("[[:space:]]", "_", datafile$Stock_Abundance[1])
-stockname <- datafile$Stock_Name[1]
-stockspecies <- datafile$Stock_Species[1]
-#maybe this isn't necessary?
-# -> GP: I think the simple extract is fine. it reads in as a data frame,
-# so should be numeric for year col
-#forecastingyear <- as.numeric(stringr::str_replace_all(datafile$Forecasting_Year[1], "\n",""))
-forecastingyear <- datafile$Forecasting_Year[1]
-
-
-
-# max year check (drop data that shouldn't be there given the FC year)
-# see https://github.com/avelez-espino/forecastR_phase4/issues/55
-# doing this here based on run year (rather than based on fcyear-age-1 vs brood year)
-# this should handle all the alternative file formats
-
-# NOTE: this also handles the issue of additional run years added to include covariates or predictors
-# use the original source below for extracting the covariates and/or predictors
-
-datafile.orig <- datafile
-
-datafile <- datafile[datafile$Run_Year < forecastingyear, ]
-
-
-#_______________
-# FILE WITHOUT AGE CLASSES
-#_______________
-
-if(file.type == "WithoutAge"){
-
-
-datafile_new <- NA
-
-tmpsub <-  datafile[,c("Run_Year",paste("Average_",stockabundance,sep=""),cov.list, predictor.list)]
-names(tmpsub) <- c("Run_Year","Total",cov.list, predictor.list)
-
-
-
-
-# merge into data obj
-data.obj <- list(data=list(Total=tmpsub) , output.pre = datafile_new,
-specs = list(stockabundance=stockabundance, stockname=stockname, stockspecies=stockspecies , forecastingyear=forecastingyear))
-
-if(length(cov.list)>0){
-	data.obj <- c(data.obj,list(covariates = datafile.orig[,c("Run_Year",cov.list)]))
-	}
-
-if(length(predictor.list)>0){
-	data.obj <- c(data.obj,list(predictors = datafile.orig[,c("Run_Year",predictor.list)]))
-	}
-
-
-
-}#END file without age classes
-
-
-#________________
-# FILE STYLE WITH AGE CLASSES
-#________________
-
-if(file.type == "WithAge"){
-
-# Note: if any other year.labels are added here, they need to be also included in Module_fitModel.R
-# NOTE: alternative labels for age cannot have any numbers other than the age!
-if(out.labels == "v1"){ age.prefix <- "age" ; age.sep <- "" ; year.labels <- c("CY","BY") ; age.col.prefix <- "T"}
-if(out.labels == "v2"){ age.prefix <- "Age" ; age.sep <- " " ;  year.labels <- c("Run_Year","Brood_Year") ; age.col.prefix <- "Age_" }
-
-extract_ages <- sort(unique(datafile$Age_Class))
-
-# for now, ignore the Total rows if they are there
-# https://github.com/avelez-espino/forecastR_phase4/issues/92
-extract_ages <- extract_ages[!(tolower(extract_ages) ==  "total")]
-
-
-extract_names <- c(year.labels,paste(age.col.prefix,extract_ages,sep=""))
-
-
-
-# tmpsub <- list()
-# for (i in 1:length(extract_ages)){
-#     tmpsub[[i]] <- subset(datafile, datafile$Age_Class==extract_ages[i])[,c("Brood_Year",paste0("Average","_",stockabundance))]
-	# rename the new data sets by age
-	#dimnames(tmpsub[[i]])[[2]] <- c(year.labels[2],paste(age.col.prefix,extract_ages[i], sep=""))
-
-tmpsub <- lapply(extract_ages, FUN=function(age, datafile, year.labels){
-	dat.tmp <- datafile[datafile$Age_Class==age, c(year.labels,paste0("Average","_",stockabundance),cov.list, predictor.list)]
-	colnames(dat.tmp)[3] <- paste0(age.col.prefix, age)
-	return(dat.tmp)
-}, datafile, year.labels)
-
-
-names(tmpsub) <- paste(age.prefix,extract_ages, sep= age.sep)
-
-
-
-# extract just the original dataset (excluding totals, if they are in the file)
-has.total <- "total" %in% tolower(datafile$Age_Class)
-
-tmpsub.use <- tmpsub
-if(has.total){tmpsub.use[["Age Total"]] <- NULL }
-
-datafile_new  <- Reduce(function(...) merge(...,by=year.labels[2], all=T), lapply(tmpsub.use,function(x) x[,2:3]))
-
-datafile_new <- cbind(datafile_new,Total = rowSums(datafile_new %>% select(-Brood_Year), na.rm = TRUE))
-
-
-##############################
-# Add spawners, if in data file
-
-if(has.spn){
-
-# get simplified spn df
-
-spn.simple <- datafile %>% select(Brood_Year,all_of(spn.col)) %>% unique()
-
-# warning and error of have different spawner numbers for same brood year
-dupl.flag <- sum(duplicated(spn.simple$Brood_Year)) > 0
-if(dupl.flag){warning("Data file has multiple spawner values for the same brood year. Need to fix!")
-				stop() }
-
-if(!dupl.flag){
-
-datafile_new <- datafile_new %>% left_join(spn.simple, by = "Brood_Year")
-
-}
-}
-
-
-
-
-
-
-
-
-# Removing this for now, because stripping out totals
-# see https://github.com/avelez-espino/forecastR_phase4/issues/92
-# add total age list element (if not in data)
-#if(!has.total){
-#	# not essential for now, deal with later, depending on discussion
-# 	}
-
-
-
-
-
-
-#MF: revised so run year wasn't lost
-# adding run year columns
-# for(age.use in extract_ages){
-#
-# 	idx.use <- match(paste(age.prefix,age.use, sep= age.sep),names(tmpsub))
-# 	#grep works too!
-# 	#idx.use <- grep(pattern = age.use, x = names(tmpsub))
-#
-# 	tmpsub[[idx.use]] <- cbind(X = tmpsub[[idx.use]][,year.labels[2]] + age.use,tmpsub[[idx.use]])
-# 	names(tmpsub[[idx.use]])[1] <- year.labels[1]
-# 	}
-
-#MF: recombining to a single data frame:
-data.original <- lapply(tmpsub, function(x){
-	y.colname <- colnames(x)[3]
-	x$age <- as.integer(substr(y.colname, nchar(y.colname), nchar(y.colname)))
-	colnames(x)[3] <- "value"
-	return(x)
-	})
-data.original <- do.call('rbind', data.original)
-rownames(data.original) <- NULL
-
-# merge into data obj
-data.obj <- list(data=tmpsub, data.original=data.original, output.pre = datafile_new,specs = list(stockabundance=stockabundance, stockname=stockname, stockspecies=stockspecies , forecastingyear=forecastingyear))
-
-
-#############
-# Add covariates, predictors
-
-
-
-
-
-
-
-
-if(length(cov.list)>0){
-
-	tmpsub.cov <- lapply(extract_ages, FUN=function(age, datafile.orig, year.labels){
-		dat.tmp.orig <- datafile.orig[datafile.orig$Age_Class==age, c(year.labels,cov.list)]
-		return(dat.tmp.orig)
-	}, datafile.orig, year.labels)
-
-
-	names(tmpsub.cov) <- paste(age.prefix,extract_ages, sep= age.sep)
-
-	data.obj <- c(data.obj,list(covariates = tmpsub.cov))
-}
-
-if(length(predictor.list)>0){
-
-	tmpsub.pred <- lapply(extract_ages, FUN=function(age, datafile.orig, year.labels){
-		dat.tmp.orig <- datafile.orig[datafile.orig$Age_Class==age, c(year.labels,predictor.list)]
-		#print(dat.tmp.orig)
-		return(dat.tmp.orig)
-	}, datafile.orig, year.labels)
-
-
-	names(tmpsub.pred) <- paste(age.prefix,extract_ages, sep= age.sep)
-	#print(tmpsub.pred)
-	data.obj <- c(data.obj,list(predictors = tmpsub.pred))
-
-}
-
-
-
-
-
-
-
-
-
-
-}#END if(file.type == "OldWithAge")
-
-
-
-###################
-# sibreg setup
-# need this as a separate piece, regardless of whether input has age structure, b/c
-# previous version of fitModel() had only the $data element from prepData output as an input.
-# for the app, need to have all the elements, even if they are NULL and aren't used.
-if(file.type == "WithoutAge"){sibreg.df <- NULL }
-if(file.type == "WithAge"){sibreg.df <- prepSibRegData(data.by.age = tmpsub)}
-data.obj <- c(data.obj,list(sibreg.in = sibreg.df))
-
-
-
-
-
-
-return(data.obj)
-
+prepData_test <- function(datafile,out.labels = "v1",
+                          age.prop.threshold = 0.05, age.prop.years = 20){
+  # datafile is a data frame object created by read.csv (with stringsAsFactors=FALSE)
+  # required columns:
+  # Run_Year
+  
+  # optional columns: Age_Class : This can include just numbers, or numbers and
+  # "Total". Both cases are handled. Brood_Year: can either incl BY data, or NA
+  # (without age data, or Total rows in withage data) Cov_SomeLabel: As many
+  # covariates as you like, all must have the prefix "Cov_" and no other "_"
+  # Two arguments apply only if have data witb ages and spawners
+  # age.prop.threshold = 0.05  # Minimum proportion of recruits to include an age class
+  # age.prop.years = 20 # number of years over which to calculatw age proportions for use in SR fits (and to fikter brood years)
+  
+  
+  # remove any columns that have only NA values
+  
+  datafile <- datafile[,colSums(!is.na(datafile)) >0]
+  
+  
+  
+  # Check file to identify format
+  # 2 possibilities:WithAge, WithoutAge
+  
+  has.age.col <- tolower("Age_Class") %in% tolower(names(datafile))
+  if(!has.age.col){has.age.data <- FALSE}
+  if(has.age.col){has.age.data <-  any(tolower(unique(datafile$Age_Class)) != "total")}
+  if(has.age.data) { file.type <- "WithAge" }
+  if(!has.age.data){ file.type <- "WithoutAge"}
+  
+  # flag if
+  
+  spn.check <- sum(grepl("spn|spawner|esc",tolower(names(datafile))))
+  if(spn.check == 0){has.spn <- FALSE}
+  if(spn.check == 1){has.spn <- TRUE
+  spn.col <- names(datafile)[grepl("spn|spawner|esc",tolower(names(datafile)))]
+  }
+  if(spn.check >1){warning("Data file has multiple possible spawner columns! Can only have one column label that contains Spn, Spawner, or Esc")
+    stop()}
+  
+  
+  
+  cov.list <- names(datafile)[grep("cov_",tolower(names(datafile)))]
+  #print(cov.list)
+  #print(length(cov.list))
+  predictor.list <- names(datafile)[grep("pred_",tolower(names(datafile)))]
+  #print(predictor.list)
+  #print(length(predictor.list))
+  
+  stockabundance <- gsub("[[:space:]]", "_", datafile$Stock_Abundance[1])
+  stockname <- datafile$Stock_Name[1]
+  stockspecies <- datafile$Stock_Species[1]
+  #maybe this isn't necessary?
+  # -> GP: I think the simple extract is fine. it reads in as a data frame,
+  # so should be numeric for year col
+  #forecastingyear <- as.numeric(stringr::str_replace_all(datafile$Forecasting_Year[1], "\n",""))
+  forecastingyear <- datafile$Forecasting_Year[1]
+  
+  
+  
+  # max year check (drop data that shouldn't be there given the FC year)
+  # see https://github.com/avelez-espino/forecastR_phase4/issues/55
+  # doing this here based on run year (rather than based on fcyear-age-1 vs brood year)
+  # this should handle all the alternative file formats
+  
+  # NOTE: this also handles the issue of additional run years added to include covariates or predictors
+  # use the original source below for extracting the covariates and/or predictors
+  
+  datafile.orig <- datafile
+  
+  datafile <- datafile[datafile$Run_Year < forecastingyear, ]
+  
+  
+  #_______________
+  # FILE WITHOUT AGE CLASSES
+  #_______________
+  
+  if(file.type == "WithoutAge"){
+    
+    
+    datafile_new <- NA
+    
+    tmpsub <-  datafile[,c("Run_Year",paste("Average_",stockabundance,sep=""),cov.list, predictor.list)]
+    names(tmpsub) <- c("Run_Year","Total",cov.list, predictor.list)
+    
+    
+    
+    
+    # merge into data obj
+    data.obj <- list(data=list(Total=tmpsub) , output.pre = datafile_new,
+                     specs = list(stockabundance=stockabundance, stockname=stockname, stockspecies=stockspecies , forecastingyear=forecastingyear))
+    
+    if(length(cov.list)>0){
+      data.obj <- c(data.obj,list(covariates = datafile.orig[,c("Run_Year",cov.list)]))
+    }
+    
+    if(length(predictor.list)>0){
+      data.obj <- c(data.obj,list(predictors = datafile.orig[,c("Run_Year",predictor.list)]))
+    }
+    
+    
+    
+  }#END file without age classes
+  
+  
+  #________________
+  # FILE STYLE WITH AGE CLASSES
+  #________________
+  
+  if(file.type == "WithAge"){
+    
+    # Note: if any other year.labels are added here, they need to be also included in Module_fitModel.R
+    # NOTE: alternative labels for age cannot have any numbers other than the age!
+    if(out.labels == "v1"){ age.prefix <- "age" ; age.sep <- "" ; year.labels <- c("CY","BY") ; age.col.prefix <- "T"}
+    if(out.labels == "v2"){ age.prefix <- "Age" ; age.sep <- " " ;  year.labels <- c("Run_Year","Brood_Year") ; age.col.prefix <- "Age_" }
+    
+    extract_ages <- sort(unique(datafile$Age_Class))
+    
+    # for now, ignore the Total rows if they are there
+    # https://github.com/avelez-espino/forecastR_phase4/issues/92
+    extract_ages <- extract_ages[!(tolower(extract_ages) ==  "total")]
+    
+    
+    extract_names <- c(year.labels,paste(age.col.prefix,extract_ages,sep=""))
+    
+    
+    
+    # tmpsub <- list()
+    # for (i in 1:length(extract_ages)){
+    #     tmpsub[[i]] <- subset(datafile, datafile$Age_Class==extract_ages[i])[,c("Brood_Year",paste0("Average","_",stockabundance))]
+    # rename the new data sets by age
+    #dimnames(tmpsub[[i]])[[2]] <- c(year.labels[2],paste(age.col.prefix,extract_ages[i], sep=""))
+    
+    tmpsub <- lapply(extract_ages, FUN=function(age, datafile, year.labels){
+      dat.tmp <- datafile[datafile$Age_Class==age, c(year.labels,paste0("Average","_",stockabundance),cov.list, predictor.list)]
+      colnames(dat.tmp)[3] <- paste0(age.col.prefix, age)
+      return(dat.tmp)
+    }, datafile, year.labels)
+    
+    
+    names(tmpsub) <- paste(age.prefix,extract_ages, sep= age.sep)
+    
+    
+    
+    # extract just the original dataset (excluding totals, if they are in the file)
+    has.total <- "total" %in% tolower(datafile$Age_Class)
+    
+    tmpsub.use <- tmpsub
+    if(has.total){tmpsub.use[["Age Total"]] <- NULL }
+    
+    datafile_new  <- Reduce(function(...) merge(...,by=year.labels[2], all=T), lapply(tmpsub.use,function(x) x[,2:3]))
+    
+    datafile_new <- cbind(datafile_new,Total = rowSums(datafile_new %>% select(-Brood_Year), na.rm = TRUE))
+    
+    
+    ##############################
+    # Add spawners, if in data file
+    
+    if(has.spn){
+      
+      # get simplified spn df
+      
+      spn.simple <- datafile %>% select(Brood_Year,all_of(spn.col)) %>% unique()
+      names(spn.simple)[2] <- "Spn"
+      
+     
+      
+      # warning and error of have different spawner numbers for same brood year
+      dupl.flag <- sum(duplicated(spn.simple$Brood_Year)) > 0
+      if(dupl.flag){warning("Data file has multiple spawner values for the same brood year. Need to fix!")
+        stop() }
+      
+      if(!dupl.flag){
+        
+        datafile_new <- datafile_new %>% left_join(spn.simple, by = "Brood_Year")
+        
+        # identify ages needed for an "almost full cohort", 
+        # so can subset brood years in SR data to only include "full" cohorts
+        
+        age.labels <- paste0(age.col.prefix, extract_ages)
+        rec.tmp <- datafile_new  %>% select(all_of(age.labels) )
+        age.prop.tmp <- round(rec.tmp / datafile_new$Total, 3) %>% drop_na() %>% tail(age.prop.years)
+        
+        mean.age.props <- colMeans(age.prop.tmp,na.rm=TRUE)
+        ages.sr <- age.labels[mean.age.props >= age.prop.threshold]
+        
+        
+        sr.out <- datafile_new %>% select(Brood_Year,Spn,Total,all_of(ages.sr)) %>% drop_na() %>%
+                dplyr::rename(Rec = Total)
+        
+       age.props.out <- mean.age.props[ages.sr]
+       age.props.out <- age.props.out/sum(age.props.out) # rescale to 1
+       
+        
+      }
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    # Removing this for now, because stripping out totals
+    # see https://github.com/avelez-espino/forecastR_phase4/issues/92
+    # add total age list element (if not in data)
+    #if(!has.total){
+    #	# not essential for now, deal with later, depending on discussion
+    # 	}
+    
+    
+    
+    
+    
+    
+    #MF: revised so run year wasn't lost
+    # adding run year columns
+    # for(age.use in extract_ages){
+    #
+    # 	idx.use <- match(paste(age.prefix,age.use, sep= age.sep),names(tmpsub))
+    # 	#grep works too!
+    # 	#idx.use <- grep(pattern = age.use, x = names(tmpsub))
+    #
+    # 	tmpsub[[idx.use]] <- cbind(X = tmpsub[[idx.use]][,year.labels[2]] + age.use,tmpsub[[idx.use]])
+    # 	names(tmpsub[[idx.use]])[1] <- year.labels[1]
+    # 	}
+    
+    #MF: recombining to a single data frame:
+    data.original <- lapply(tmpsub, function(x){
+      y.colname <- colnames(x)[3]
+      x$age <- as.integer(substr(y.colname, nchar(y.colname), nchar(y.colname)))
+      colnames(x)[3] <- "value"
+      return(x)
+    })
+    data.original <- do.call('rbind', data.original)
+    rownames(data.original) <- NULL
+    
+    # merge into data obj
+    data.obj <- list(data=tmpsub, data.original=data.original, output.pre = datafile_new,
+                     specs = list(stockabundance=stockabundance, stockname=stockname, stockspecies=stockspecies , 
+                                  forecastingyear=forecastingyear),
+                     sr.model.in = list(
+                       sr.data = sr.out,
+                       sr.ageprops = age.props.out,
+                       sr.ageprops.settings = c(threshold = age.prop.threshold, 
+                                                numyears = age.prop.years)
+                       )
+                     )
+    
+    
+    #############
+    # Add covariates, predictors
+    
+    
+    
+    
+    
+    
+    
+    
+    if(length(cov.list)>0){
+      
+      tmpsub.cov <- lapply(extract_ages, FUN=function(age, datafile.orig, year.labels){
+        dat.tmp.orig <- datafile.orig[datafile.orig$Age_Class==age, c(year.labels,cov.list)]
+        return(dat.tmp.orig)
+      }, datafile.orig, year.labels)
+      
+      
+      names(tmpsub.cov) <- paste(age.prefix,extract_ages, sep= age.sep)
+      
+      data.obj <- c(data.obj,list(covariates = tmpsub.cov))
+    }
+    
+    if(length(predictor.list)>0){
+      
+      tmpsub.pred <- lapply(extract_ages, FUN=function(age, datafile.orig, year.labels){
+        dat.tmp.orig <- datafile.orig[datafile.orig$Age_Class==age, c(year.labels,predictor.list)]
+        #print(dat.tmp.orig)
+        return(dat.tmp.orig)
+      }, datafile.orig, year.labels)
+      
+      
+      names(tmpsub.pred) <- paste(age.prefix,extract_ages, sep= age.sep)
+      #print(tmpsub.pred)
+      data.obj <- c(data.obj,list(predictors = tmpsub.pred))
+      
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+  }#END if(file.type == "OldWithAge")
+  
+  
+  
+  ###################
+  # sibreg setup
+  # need this as a separate piece, regardless of whether input has age structure, b/c
+  # previous version of fitModel() had only the $data element from prepData output as an input.
+  # for the app, need to have all the elements, even if they are NULL and aren't used.
+  if(file.type == "WithoutAge"){sibreg.df <- NULL }
+  if(file.type == "WithAge"){sibreg.df <- prepSibRegData(data.by.age = tmpsub)}
+  data.obj <- c(data.obj,list(sibreg.in = sibreg.df))
+  
+  
+  
+  
+  
+  
+  return(data.obj)
+  
 }# END prepData
+
+
 
 
 
