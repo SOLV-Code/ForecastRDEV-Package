@@ -25,7 +25,7 @@
 #' @examples
 
 
-prepData_test <- function(datafile,out.labels = "v1",
+prepData <- function(datafile,out.labels = "v1",
                           age.prop.threshold = 0.05, age.prop.years = 20){
   # datafile is a data frame object created by read.csv (with stringsAsFactors=FALSE)
   # required columns:
