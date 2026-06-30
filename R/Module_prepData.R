@@ -212,8 +212,8 @@ prepData <- function(datafile,out.labels = "v1",
         ages.sr <- age.labels[mean.age.props >= age.prop.threshold]
         
         
-        sr.out <- datafile_new %>% select(Brood_Year,Spn,Total,all_of(ages.sr)) %>% drop_na() %>%
-                dplyr::rename(Rec = Total)
+       sr.out <- datafile_new %>% select(Brood_Year,Spn,Total,all_of(ages.sr)) %>% drop_na() %>%
+                dplyr::rename(Rec = Total) %>% mutate(lnRpS = round(log(Rec/Spn),4))
         
        age.props.out <- mean.age.props[ages.sr]
        age.props.out <- age.props.out/sum(age.props.out) # rescale to 1
