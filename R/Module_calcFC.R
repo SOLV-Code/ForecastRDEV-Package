@@ -325,7 +325,8 @@ if(model %in% list.custom.models){
 
 data <-  model.functions.src[[model]]$fcdataprep(data.obj = data.obj. , fc.yr=fc.yr)
 
-if(tracing){print("custom data prep for fc done")}
+if(tracing){print("custom data prep for fc done")
+			print(data)}
 
 }
 
