@@ -25,23 +25,19 @@
 #' @export
 #'
 #' @examples
-fitModel <- function(model= NULL, # can't provide argument list here anymore, because custom models
-						data = NULL, data.sibreg = NULL, 
-						data.obj = NULL, settings = NULL,tracing=FALSE, 
+fitModel <- function(model= NULL, # can't provide list  of models here anymore, because custom models
+						data = NULL, data.sibreg = NULL, # these two will be obsolete once all models link back to full obj
+						data.obj = NULL,  
+						settings = NULL,tracing=FALSE, 
 						custom.models = NULL){
 # Check inputs
 # need to create list of available models, including custom models
 
-
 model.functions.src <- c(estimation.functions,custom.models)
-
 list.builtin.models <- names(estimation.functions)
 list.custom.models <- names(custom.models)
-
 model.available <- names(model.functions.src)
-
-
-print(model.available)
+if(tracing){print(model.available)}
 
 
 #model <- match.arg(model) # can't do arg.match neatly with custom in the mix
@@ -472,7 +468,7 @@ if(model %in%  c("NoAgeCovar")){
 
 
 pm.out <- resids.pm(out.list,type="fitted")
-out.list <- c(out.list,list(fitted.pm=pm.out),list(settings = settings))
+out.list <- c(out.list,list(fitted.pm=pm.out),list(settings = settings),model.label = model)
 
 return(out.list)
 

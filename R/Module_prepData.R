@@ -217,6 +217,9 @@ prepData <- function(datafile,out.labels = "v1",
         
        age.props.out <- mean.age.props[ages.sr]
        age.props.out <- age.props.out/sum(age.props.out) # rescale to 1
+	   
+	   all.age.props.out <- mean.age.props/sum(mean.age.props) # recale to 1
+	   
        
         
       }
@@ -266,25 +269,26 @@ prepData <- function(datafile,out.labels = "v1",
     # merge into data obj
     data.obj <- list(data=tmpsub, data.original=data.original, output.pre = datafile_new,
                      specs = list(stockabundance=stockabundance, stockname=stockname, stockspecies=stockspecies , 
-                                  forecastingyear=forecastingyear),
-                     sr.model.in = list(
-                       sr.data = sr.out,
-                       sr.ageprops = age.props.out,
-                       sr.ageprops.settings = c(threshold = age.prop.threshold, 
+                                  forecastingyear=forecastingyear))
+								  
+	if(has.spn){							  
+	      data.obj <- c(data.obj,list(
+                       sr.model.in = list(
+                         sr.data = sr.out,
+						 sr.ages = as.numeric(ages.sr),
+                         sr.ageprops = age.props.out,
+                         sr.ageprops.settings = c(threshold = age.prop.threshold, 
                                                 numyears = age.prop.years)
+						all.ageprops = all.age.props.out
                        )
                      )
+					)
     
     
     #############
     # Add covariates, predictors
     
-    
-    
-    
-    
-    
-    
+       
     
     if(length(cov.list)>0){
       

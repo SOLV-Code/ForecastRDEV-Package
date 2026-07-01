@@ -14,7 +14,11 @@
 #' @export
 #'
 #' @examples
-calcFC <- function(fit.obj= NULL, data = NULL, data.sibreg = NULL, fc.yr= NULL, settings = NULL, tracing=FALSE, predictors = NULL, covariates = NULL ){
+calcFC <- function(fit.obj= NULL, 
+		data = NULL, data.sibreg = NULL, # these two will be obsolete once all models link back to full obj
+		data.obj = NULL
+		fc.yr= NULL, settings = NULL, tracing=FALSE, predictors = NULL, covariates = NULL, 
+		custom.models = NULL ){
 # Check inputs
 
 	# GP 2021: I think the predictors and covariates arguments are no longer used, need to verify!!!!!!!!!!!!!!!
@@ -40,12 +44,14 @@ calcFC <- function(fit.obj= NULL, data = NULL, data.sibreg = NULL, fc.yr= NULL, 
 	# do the point forecast (for all age classes, have set up NoAge to work with the same function)
  #print(predictors)
 	out.list <- sub.pt.fc(fit=fit.obj,
-												data.source=data ,
+						 						data.source=data ,
 												 data.sibreg = data.sibreg,
+												 data.obj = data.obj,
 												fc.yr = fc.yr,
 												fit.settings=settings,
 												pred. = predictors,
-												cov. = covariates)
+												cov. = covariates,
+												custom.models. = custom.models)
 
 	return(out.list)
 
@@ -59,12 +65,14 @@ sub.fcdata <- function(fit,data = NULL ,data.sibreg = NULL, fc.yr,pred = NULL, c
 
 #print("starting sub.fcdata()")
 
+
 data.list <- list()
 
 age.classes <- names(data)
 ages <- as.numeric(gsub("\\D", "", age.classes)) # as per https://stat.ethz.ch/pipermail/r-help/2011-February/267946.html
 
 age.prefix <- gsub(ages[1],"",age.classes[1])
+
 
 
 #print("ages")
@@ -280,10 +288,12 @@ return(data.list)
 
 ##########################################################################################################
 
-sub.pt.fc <- function(fit,data.source,
-											data.sibreg = NULL,
-											fc.yr,fit.settings = NULL,
-											pred. = NULL, cov.= NULL){
+sub.pt.fc <- function(fit,data.source,data.sibreg = NULL,
+						data.obj. = data.obj,
+						fc.yr,fit.settings = NULL,
+						pred. = NULL, cov.= NULL,
+						custom.models. = custom.models){
+
 
 # extract data needed for the fc (one element for each age class)
 
@@ -294,9 +304,32 @@ sub.pt.fc <- function(fit,data.source,
 # had to change argument names because of error: "promise already under evaluation: recursive default argument reference or earlier problems?"
 # solution as per: https://stackoverflow.com/questions/4357101/promise-already-under-evaluation-recursive-default-argument-reference-or-earlie
 
-	# GP 2021: I think the predictors and covariates arguments are no longer used, need to very!!!!!!!!!!!!!!!
+# GP 2021: I think the predictors and covariates arguments are no longer used, need to verify!!!!!!!!!!!!!!!
 
+model.functions.src <- c(estimation.functions,custom.models)
+list.builtin.models <- names(estimation.functions)
+list.custom.models <- names(custom.models)
+
+model <- fit$model.label
+
+
+# for built-in models, go through the steps below (for now)
+# for custom models, use the fcdataprep fn that's part of the model object
+# over time, migrate ALL the models to a fn that's part of the model object
+
+if(model %in% list.builtin.models){
 data <- sub.fcdata(fit = fit , data = data.source, data.sibreg = data.sibreg , fc.yr=fc.yr,pred = pred.,cov.in = cov.)
+}
+
+if(model %in% list.custom.models){
+
+data <-  model.functions.src[[model]]$fcdataprep(data.obj = data.obj. , fc.yr=fc.yr)
+
+if(tracing){print("custom data prep for fc done")}
+
+}
+
+
 
 #print("output from sub.fcdata()-----------------------")
 #print(data)
