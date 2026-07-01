@@ -16,7 +16,7 @@
 #' @examples
 calcFC <- function(fit.obj= NULL, 
 		data = NULL, data.sibreg = NULL, # these two will be obsolete once all models link back to full obj
-		data.obj = NULL
+		data.obj = NULL,
 		fc.yr= NULL, settings = NULL, tracing=FALSE, predictors = NULL, covariates = NULL, 
 		custom.models = NULL ){
 # Check inputs

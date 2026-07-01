@@ -278,13 +278,13 @@ prepData <- function(datafile,out.labels = "v1",
 						 sr.ages = as.numeric(ages.sr),
                          sr.ageprops = age.props.out,
                          sr.ageprops.settings = c(threshold = age.prop.threshold, 
-                                                numyears = age.prop.years)
+                                                numyears = age.prop.years),
 						all.ageprops = all.age.props.out
                        )
                      )
 					)
     
-    
+    }
     #############
     # Add covariates, predictors
     
