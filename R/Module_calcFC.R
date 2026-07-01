@@ -306,9 +306,9 @@ sub.pt.fc <- function(fit,data.source,data.sibreg = NULL,
 
 # GP 2021: I think the predictors and covariates arguments are no longer used, need to verify!!!!!!!!!!!!!!!
 
-model.functions.src <- c(estimation.functions,custom.models)
+model.functions.src <- c(estimation.functions,custom.models.)
 list.builtin.models <- names(estimation.functions)
-list.custom.models <- names(custom.models)
+list.custom.models <- names(custom.models.)
 
 model <- fit$model.label
 
