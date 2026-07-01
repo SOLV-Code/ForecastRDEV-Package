@@ -8,11 +8,13 @@ calcFC(
   fit.obj = NULL,
   data = NULL,
   data.sibreg = NULL,
+  data.obj = NULL,
   fc.yr = NULL,
   settings = NULL,
   tracing = FALSE,
   predictors = NULL,
-  covariates = NULL
+  covariates = NULL,
+  custom.models = NULL
 )
 }
 \arguments{

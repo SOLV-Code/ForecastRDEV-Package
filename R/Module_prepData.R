@@ -275,7 +275,7 @@ prepData <- function(datafile,out.labels = "v1",
 	      data.obj <- c(data.obj,list(
                        sr.model.in = list(
                          sr.data = sr.out,
-						 sr.ages = as.numeric(ages.sr),
+						 sr.ages = as.numeric(gsub("Age_","",ages.sr)),
                          sr.ageprops = age.props.out,
                          sr.ageprops.settings = c(threshold = age.prop.threshold, 
                                                 numyears = age.prop.years),
